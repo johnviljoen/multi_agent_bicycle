@@ -1,4 +1,5 @@
 # *.png
+_speed_test.py
 
 # Mujoco
 MUJOCO_LOG.TXT

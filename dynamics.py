@@ -53,7 +53,7 @@ if __name__ == "__main__":
         return x_new, None        
 
     tic = time()
-    x, _ = jax.lax.scan(scan_body, x, None, length=n_iter)
+    x, _ = scan(scan_body, x, None, length=n_iter)
     toc = time()
     scan_time = toc-tic
     print(toc-tic)
@@ -69,8 +69,6 @@ if __name__ == "__main__":
     print(f"fps per vehicle for loop: {n_iter * num_envs / loop_time}")
 
     # seem to get ~1.4 billion FPS fopr scan, ~91 million FPS for loop
-
-    
 
 
 
