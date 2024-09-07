@@ -120,11 +120,96 @@ def _rectangle_obstacles(x, case_params, car_params):
 
     return collision
 
+def _overlap(points, halfspaces):
+    # retrieve halfspace info of polygon: aibi @ x + ci = 0; equiv. to. ax + by + c = 0
+    ai = halfspaces[0]
+    bi = halfspaces[1]
+    ci = halfspaces[2]
+
+    x0 = points[:,0]
+    y0 = points[:,1]
+
+    sign = ai * x0 + bi * y0 + ci
+    return (~ jnp.any((sign > 0), axis=0)).sum() # point inside obstacle
+
+def _rectangle_obstacles(x, case_params, car_params):
+    """check collision between rectangle and all other obstacles (including other car rectangles).
+    If we are on CPU there are alternative algorithms that are faster (https://en.wikipedia.org/wiki/Point_in_polygon).
+    However in a JAX jitted GPU implementation control flow is not allowed if it dictates dynamic shapes - therefore
+    I have gone with a projection based approach which can be parallelized on GPU.
+
+    we define a symmetric collision matrix data structure as follows:
+
+    mat = |o - - -| 
+          |i o - -|
+          |i i o -|
+          |i i i o|
+
+    where diagonal elements at {i,i} represent if car {i} is colliding with any obstacle,
+    and off diagonal elements {i,j} represent if a car {i} is colliding with another car {j}.
+    This gives all the information we need for the simulation later
+    Args:
+        x: joint state vector of multi agent env (4x{x,y,yaw,v})
+        case_params 
+        car_params
+    Returns: 
+        collision_matrix: as described above
+    """
+
+    collision_matrix = jnp.empty([case_params["num_cars"], case_params["num_cars"]])
+    car_nums = [i for i in range(case_params["num_cars"])]
+
+    for i, xi in enumerate(x): # iterate through each agent in the env
+        
+        # corners of current ego car
+        corners = _get_corners(xi, car_params)
+
+        # add the other agents to the list of obstacles at this time
+        other_car_nums = car_nums.copy()
+        other_car_nums.remove(i)
+        car_v = []
+        car_h = []
+        for j in other_car_nums:
+            _obs_v = _get_corners(x[j], car_params)
+            car_v.append(_obs_v)
+            # repeat the first point so we get all edges between vertices
+            _obs_v = jnp.vstack([_obs_v, _obs_v[0]])
+            # ax + by + c = 0
+            ai = _obs_v[:-1, 1:2] - _obs_v[1:, 1:2]
+            bi = _obs_v[1:, 0:1] - _obs_v[:-1, 0:1]
+            ci = _obs_v[:-1, 0:1] * _obs_v[1:, 1:2] - _obs_v[1:, 0:1] * _obs_v[:-1, 1:2]
+            car_h.append([ai, bi, ci])
+
+        # check collision with other cars - only need to do one way test as we loop over all cars
+        for j, _car_h in enumerate(car_h):
+            inside = _overlap(corners, _car_h)
+            collision_matrix = collision_matrix.at[i,j].set(collision_matrix[i,j] + inside)
+
+        # go through every obstacle for every corner
+        for _obs_h in case_params["obs_h"]:
+            inside = _overlap(corners, _obs_h)
+            collision_matrix = collision_matrix.at[i,i].set(collision_matrix[i,i] + inside)
+
+        # check every corner of every obstacle if its inside the agent
+        obs_v_vec = jnp.vstack(case_params["obs_v"])
+
+        # get the halfspaces for the current ego vehicle
+        _obs_v = jnp.vstack([corners, corners[0]])
+        ai = _obs_v[:-1, 1:2] - _obs_v[1:, 1:2]
+        bi = _obs_v[1:, 0:1] - _obs_v[:-1, 0:1]
+        ci = _obs_v[:-1, 0:1] * _obs_v[1:, 1:2] - _obs_v[1:, 0:1] * _obs_v[:-1, 1:2]
+
+        inside = _overlap(obs_v_vec, [ai, bi, ci])
+        collision_matrix = collision_matrix.at[i,i].set(collision_matrix[i,i] + inside)
+
+    return collision_matrix
+
 def collision(x, case_params, car_params):
     pass
 
 if __name__ == "__main__":
 
+    import matplotlib.pyplot as plt
     from params import car_params
     from scenario_utils import read
     import jax.random as jr
@@ -132,16 +217,18 @@ if __name__ == "__main__":
     import functools
     from time import time
     case_params = read("data/cases/test_case.csv")
-    num_envs = 100000
+    num_envs = 10
     x = jnp.array([
-        [0, 0, jnp.deg2rad(20)],
-        [2, 5, jnp.deg2rad(-35)]
+        [0, 2, jnp.deg2rad(20)],
+        [0, 0, jnp.deg2rad(20)]
     ])
     x = jnp.stack([x]*num_envs)
-    x = jr.normal(jr.PRNGKey(0), shape=x.shape)
+    # x = jr.normal(jr.PRNGKey(0), shape=x.shape)
 
     f = jax.jit(jax.vmap(functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params)))
-    # f = _rectangle_obstacles
+    # f = jax.vmap(functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params))
+    # f = functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params)
+    # x = x[0]
     violation = f(x)
     violation = f(x)
 
@@ -156,6 +243,12 @@ if __name__ == "__main__":
     toc = time()
     print(toc-tic)
 
-    # now lets plot an environment animation and see this in action
+    x = x[0]
+    for xi in x:
+        corners = _get_corners(xi, car_params)
+        plt.plot(corners[:,0], corners[:,1], 'black')
+    plt.savefig('test.png', dpi=500)
 
-    print('sin')
+    # now lets plot an environment animation and see this in action
+    # print(violation)
+    print('fin')

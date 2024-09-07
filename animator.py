@@ -10,6 +10,7 @@ class Animator:
             case_params,
             traj,
             times,
+            collisions = None,
             max_frames = 500,
             Ts = 0.1,
             save_path = 'data/gifs', # None
@@ -25,6 +26,7 @@ class Animator:
         self.car_params = car_params
         self.case_params = case_params
 
+
         num_steps = len(times)
         def compute_render_interval(num_steps, max_frames):
             render_interval = 1  # Start with rendering every frame.
@@ -34,9 +36,12 @@ class Animator:
             return render_interval
         render_interval = compute_render_interval(num_steps, max_frames)
 
-        traj = traj[::render_interval,:]
-        self.traj = traj
+        self.traj = traj[::render_interval,:]
         self.times = times[::render_interval]
+        if collisions is not None:
+            self.collisions = collisions[::render_interval]
+        else:
+            self.collisions = np.zeros_like(self.times) # no collisions
         self.save_path = save_path
 
         if save_name is None:
@@ -83,9 +88,14 @@ class Animator:
     def update_lines(self, i):
 
         joint_state = self.traj[i]
+        collision = self.collisions[i]
         for i, state in enumerate(joint_state):
             corners = get_corners(self.car_params, state[0], state[1], state[2])
             self.lines[i].set_data(corners[:,0], corners[:,1])
+            if collision == True:
+                self.lines[i].set_color('red')
+            else:
+                self.lines[i].set_color('green')
 
         self.title_time.set_text(u"Time = {:.2f} s".format(self.times[i]))
 
