@@ -1,7 +1,6 @@
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
-from transforms import get_corners
 
 def read(file: str):
 
@@ -33,10 +32,20 @@ def read(file: str):
         case_params["obs_num"] = int(v[offset])
         num_vertexes = np.array(v[offset+1:offset+1 + case_params["obs_num"]], dtype=int)
         vertex_start = offset + 1 + case_params["obs_num"] + (np.cumsum(num_vertexes, dtype=int) - num_vertexes) * 2
-        case_params["obs"] = []
+        case_params["obs_v"] = [] # vertex information
         for vs, nv in zip(vertex_start, num_vertexes):
-            case_params["obs"].append(np.array(v[vs:vs + nv * 2]).reshape((nv, 2), order='A'))
+            case_params["obs_v"].append(np.array(v[vs:vs + nv * 2]).reshape((nv, 2), order='A'))
         
+        case_params["obs_h"] = [] # halfspace information
+        for obs_v in case_params["obs_v"]:
+            # repeat the first point so we get all edges between vertices
+            obs_v = np.vstack([obs_v, obs_v[0]])
+            # ax + by + c = 0
+            ai = obs_v[:-1, 1:2] - obs_v[1:, 1:2]
+            bi = obs_v[1:, 0:1] - obs_v[:-1, 0:1]
+            ci = obs_v[:-1, 0:1] * obs_v[1:, 1:2] - obs_v[1:, 0:1] * obs_v[:-1, 1:2]
+            case_params["obs_h"].append([ai, bi, ci])
+
         # Compute bounds
         all_x = [pose[0] for pose in case_params["start_poses"]] + [pose[0] for pose in case_params["goal_poses"]]
         all_y = [pose[1] for pose in case_params["start_poses"]] + [pose[1] for pose in case_params["goal_poses"]]
@@ -86,6 +95,20 @@ def write_case_csv(file_name, start_poses, goal_poses, obstacles):
         writer.writerow(csv_data)
 
 def plot_case(case_params, car_params, filename=None, show=False, save=True, bare=False):
+
+    def get_corners(car_params, x, y, yaw):
+        points = np.array([
+            [-car_params["rear_hang"], -car_params["width"] / 2, 1],
+            [ car_params["front_hang"] + car_params["wheel_base"], -car_params["width"] / 2, 1],
+            [ car_params["front_hang"] + car_params["wheel_base"], car_params["width"] / 2, 1],
+            [-car_params["rear_hang"],  car_params["width"] / 2, 1],
+            [-car_params["rear_hang"], -car_params["width"] / 2, 1],
+        ]) @ np.array([
+            [np.cos(yaw), -np.sin(yaw), x],
+            [np.sin(yaw), np.cos(yaw), y],
+            [0, 0, 1]
+        ]).T
+        return points[:, 0:2]
 
     if filename is None:
         filename = 1
@@ -158,8 +181,8 @@ if __name__ == "__main__":
     ])
 
     # Write the scenario to a CSV file
-    write_case_csv('test_case_multi_cars.csv', start_poses, goal_poses, obstacles)
-    case_params = read("test_case.csv")
-    plot_case(case_params, car_params, filename='test', show=False, save=True, bare=False)
+    write_case_csv('data/cases/test_case.csv', start_poses, goal_poses, obstacles)
+    case_params = read("data/cases/test_case.csv")
+    plot_case(case_params, car_params, filename='data/images/test', show=False, save=True, bare=False)
 
     print('fin')

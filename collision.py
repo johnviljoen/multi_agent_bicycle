@@ -33,10 +33,14 @@ def _rectangle_obstacles(x, case_params, car_params):
             [jnp.sin(xi[2]),  jnp.cos(xi[2])]
         ])
 
+        corners = 
+
+
 def collision(x, case_params, car_params):
     pass
 
 if __name__ == "__main__":
 
-
+    from scenario_utils import read
+    case_params = read()
     print('sin')
