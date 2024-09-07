@@ -51,6 +51,8 @@ def _rectangle_obstacles(x, case_params, car_params):
     However in a JAX jitted GPU implementation control flow is not allowed if it dictates dynamic shapes - therefore
     I have gone with a projection based approach which can be parallelized on GPU.
 
+    notes: this is non-differentiable unlike OBCA, this is FAST once jitted and vmapped
+
     Args:
         x: joint state vector of multi agent env (4x{x,y,yaw,v})
         case_params 
@@ -153,6 +155,7 @@ if __name__ == "__main__":
     violation = f(x)
     toc = time()
     print(toc-tic)
-    
+
+    # now lets plot an environment animation and see this in action
 
     print('sin')

@@ -2,6 +2,20 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
+def get_corners(car_params, x, y, yaw):
+    points = np.array([
+        [-car_params["rear_hang"], -car_params["width"] / 2, 1],
+        [ car_params["front_hang"] + car_params["wheel_base"], -car_params["width"] / 2, 1],
+        [ car_params["front_hang"] + car_params["wheel_base"], car_params["width"] / 2, 1],
+        [-car_params["rear_hang"],  car_params["width"] / 2, 1],
+        [-car_params["rear_hang"], -car_params["width"] / 2, 1],
+    ]) @ np.array([
+        [np.cos(yaw), -np.sin(yaw), x],
+        [np.sin(yaw), np.cos(yaw), y],
+        [0, 0, 1]
+    ]).T
+    return points[:, 0:2]
+
 def read(file: str):
 
     case_params = {}
@@ -95,20 +109,6 @@ def write_case_csv(file_name, start_poses, goal_poses, obstacles):
         writer.writerow(csv_data)
 
 def plot_case(case_params, car_params, filename=None, show=False, save=True, bare=False):
-
-    def get_corners(car_params, x, y, yaw):
-        points = np.array([
-            [-car_params["rear_hang"], -car_params["width"] / 2, 1],
-            [ car_params["front_hang"] + car_params["wheel_base"], -car_params["width"] / 2, 1],
-            [ car_params["front_hang"] + car_params["wheel_base"], car_params["width"] / 2, 1],
-            [-car_params["rear_hang"],  car_params["width"] / 2, 1],
-            [-car_params["rear_hang"], -car_params["width"] / 2, 1],
-        ]) @ np.array([
-            [np.cos(yaw), -np.sin(yaw), x],
-            [np.sin(yaw), np.cos(yaw), y],
-            [0, 0, 1]
-        ]).T
-        return points[:, 0:2]
 
     if filename is None:
         filename = 1
