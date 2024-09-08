@@ -140,6 +140,8 @@ def rectangle_mask(x, case_params, car_params):
     """
 
     collision_matrix = _rectangle_obstacles(x, case_params, car_params)
+
+    # these three logical operations are the slowest part of the whole framework - is there a better way?
     collision_mask_vert = jnp.all(collision_matrix == 0, axis=0)
     collision_mask_horz = jnp.all(collision_matrix == 0, axis=1)
     return jnp.logical_and(collision_mask_vert, collision_mask_horz)

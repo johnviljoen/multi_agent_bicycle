@@ -20,8 +20,8 @@ if __name__ == "__main__":
     case_params = scenario.read("data/cases/test_4_agent_case.csv")
 
     num_agents = case_params["num_cars"]
-    num_envs = 10 # 10_000
-    Ts = 0.1; Ti=0.0; Tf = 5.0 # Tf=10_000.0
+    num_envs = 10_000 # 10
+    Ts = 0.1; Ti=0.0; Tf=10_000.0 # 5.0
     times = jnp.arange(Ti, Tf, Ts)
     num_iter = len(times)
 
@@ -57,33 +57,33 @@ if __name__ == "__main__":
     collision_mask = collision_jit(x)
     collision_mask = collision_jit(x)
 
-    traj = []
-    not_collisions = []
-    for _ in range(num_iter):
-        collision_mask = collision_jit(x)
-        not_collisions.append(jnp.copy(collision_mask[-1]))
-        u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
-        x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
-        traj.append(jnp.copy(x[-1]))
-        c = critic_jit(u)
-    traj = jnp.stack(traj)
-    collisions = ~jnp.vstack(not_collisions)
-    animator = Animator(car_params, case_params, traj, times, collisions)
-    animator.animate()
-
-    # def scan_body(carry, _):
-    #     x, _rng, rng = carry
+    # traj = []
+    # not_collisions = []
+    # for _ in range(num_iter):
     #     collision_mask = collision_jit(x)
+    #     not_collisions.append(jnp.copy(collision_mask[-1]))
     #     u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
     #     x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
+    #     traj.append(jnp.copy(x[-1]))
     #     c = critic_jit(u)
-    #     return (x, _rng, rng), None  
+    # traj = jnp.stack(traj)
+    # collisions = ~jnp.vstack(not_collisions)
+    # animator = Animator(car_params, case_params, traj, times, collisions)
+    # animator.animate()
 
-    # tic = time()
-    # (x, _, _), _ = jax.lax.scan(scan_body, (x, _rng, rng), None, length=num_iter)
-    # toc = time()
-    # scan_time = toc-tic
-    # print(toc-tic)
+    def scan_body(carry, _):
+        x, _rng, rng = carry
+        collision_mask = collision_jit(x)
+        u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+        x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
+        c = critic_jit(u)
+        return (x, _rng, rng), None  
+
+    tic = time()
+    (x, _, _), _ = jax.lax.scan(scan_body, (x, _rng, rng), None, length=num_iter)
+    toc = time()
+    scan_time = toc-tic
+    print(toc-tic)
 
     print('fin')
 
