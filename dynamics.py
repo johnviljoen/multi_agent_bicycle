@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import jax.random as jr
 import functools
 
-def _f(x, u, car_params):
+def xdot(x, u, car_params):
     u1_clip = jnp.clip(u[1], a_min=-car_params['max_steer'], a_max=car_params['max_steer'])
 
     return jnp.hstack([
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     u += jr.normal(_rng, shape=u.shape); _rng, rng = jr.split(rng) # randomize
     
     # supply car_params to this function
-    f = functools.partial(_f, car_params=car_params)
+    f = functools.partial(xdot, car_params=car_params)
     vec_f = jit(vmap(vmap(f)))
 
     x += vec_f(x, u) * Ts

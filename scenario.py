@@ -118,7 +118,7 @@ def plot_case(case_params, car_params, filename=None, show=False, save=True, bar
     plt.gca().set_axisbelow(True)
 
     for j in range(0, case_params["obs_num"]):
-        plt.fill(case_params["obs"][j][:, 0], case_params["obs"][j][:, 1], facecolor = 'red', alpha = 0.5)
+        plt.fill(case_params["obs_v"][j][:, 0], case_params["obs_v"][j][:, 1], facecolor = 'red', alpha = 0.5)
 
     if bare is False:
 
@@ -148,6 +148,8 @@ if __name__ == "__main__":
 
     from params import car_params
 
+    #### test 2 agent case ####
+
     obstacles = np.array([
         [ # left obstacle
             [-3.8-2.5, 2.5],
@@ -171,18 +173,71 @@ if __name__ == "__main__":
 
     # Multiple cars, each with start and goal poses
     start_poses = np.array([
-        [-5.0, 4.35, 0.0],
-        [-6.0, 5.0, np.deg2rad(30)]
+        [-7.0, 4.35, np.deg2rad(-10)],
+        [6.0, 5.0, np.deg2rad(170)]
     ])
     
     goal_poses = np.array([
         [0.0, 0.0, np.deg2rad(90)],
-        [1.0, -1.0, np.deg2rad(45)]
+        [-5.0, 7.5, np.deg2rad(10)]
     ])
 
     # Write the scenario to a CSV file
-    write_case_csv('data/cases/test_case.csv', start_poses, goal_poses, obstacles)
-    case_params = read("data/cases/test_case.csv")
-    plot_case(case_params, car_params, filename='data/images/test', show=False, save=True, bare=False)
+    write_case_csv('data/cases/test_2_agent_case.csv', start_poses, goal_poses, obstacles)
+    case_params = read("data/cases/test_2_agent_case.csv")
+    plot_case(case_params, car_params, filename='data/images/test_2_agent_case', show=False, save=True, bare=False)
+    plt.close()
+
+    #### test 4 agent case ####
+
+    # Define obstacles
+    obstacles = np.array([
+        [  # Top-left parking lot (rectangular area)
+            [-12.0, 5.0],
+            [-12.0, 1.0],
+            [-9.0, 1.0],
+            [-9.0, 5.0]
+        ],
+        [  # Top-right parking lot (rectangular area)
+            [9.0, 5.0],
+            [9.0, 1.0],
+            [12.0, 1.0],
+            [12.0, 5.0]
+        ],
+        [  # Bottom-left parking lot (rectangular area)
+            [-12.0, -5.0],
+            [-12.0, -1.0],
+            [-9.0, -1.0],
+            [-9.0, -5.0]
+        ],
+        [  # Bottom-right parking lot (rectangular area)
+            [9.0, -5.0],
+            [9.0, -1.0],
+            [12.0, -1.0],
+            [12.0, -5.0]
+        ]
+    ])
+
+    # Define start poses of the vehicles
+    start_poses = np.array([
+        [7.0, -3.0, np.deg2rad(180)],  # Vehicle 0 starting from bottom-right, facing left
+        [-7.0, -4.0, np.deg2rad(0)],   # Vehicle 1 starting from bottom-left, facing right
+        [7.0, 3.0, np.deg2rad(90)],    # Vehicle 2 starting from top-right, facing upward
+        [-7.0, 4.0, np.deg2rad(-90)]   # Vehicle 3 starting from top-left, facing downward
+    ])
+
+    # Define goal poses of the vehicles
+    goal_poses = np.array([
+        [1.0, 1.0, np.deg2rad(90)],    # Vehicle 0 moves to the center, facing upward
+        [0.0, -4.0, np.deg2rad(-90)],  # Vehicle 1 moves to the center-bottom, facing downward
+        [-3.0, 3.0, np.deg2rad(180)],  # Vehicle 2 moves to center-left, facing left
+        [4.0, 2.0, np.deg2rad(0)]      # Vehicle 3 moves to the center-right, facing right
+    ])
+
+    # Write the scenario to a CSV file
+    write_case_csv('data/cases/test_4_agent_case.csv', start_poses, goal_poses, obstacles)
+    case_params = read("data/cases/test_4_agent_case.csv")
+    plot_case(case_params, car_params, filename='data/images/test_4_agent_case', show=False, save=True, bare=False)
+
 
     print('fin')

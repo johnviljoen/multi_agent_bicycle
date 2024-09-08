@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
-from scenario_utils import get_corners
+from scenario import get_corners
 
 class Animator:
     def __init__(
@@ -92,7 +92,7 @@ class Animator:
         for i, state in enumerate(joint_state):
             corners = get_corners(self.car_params, state[0], state[1], state[2])
             self.lines[i].set_data(corners[:,0], corners[:,1])
-            if collision == True:
+            if collision[i] == True:
                 self.lines[i].set_color('red')
             else:
                 self.lines[i].set_color('green')
@@ -129,7 +129,7 @@ class Animator:
 if __name__ == "__main__":
 
     from params import car_params
-    from scenario_utils import read
+    from scenario import read
 
     case_params = read("data/cases/test_case.csv")
 
