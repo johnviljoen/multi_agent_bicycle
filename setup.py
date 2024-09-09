@@ -8,8 +8,8 @@ setup(
     install_requires=[
         'matplotlib',   # plotting...
         'tqdm',         # just for pretty loops in a couple places
-        'jax[cuda12]',
-        'equinox'
+        'jax[cuda12]',  # jit, vmap
+        'equinox',      # nice jax datastructures and convenient jitting/vmapping
     ],
     packages=find_packages(include=[]),
 )

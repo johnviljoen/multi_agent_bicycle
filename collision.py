@@ -5,89 +5,8 @@ Description
 To detect collisions in the most efficient way possible
 """
 
+import geometry
 import jax.numpy as jnp
-import numpy as np
-
-def _get_rotation_mat(xi):
-
-    return jnp.array([
-        [jnp.cos(xi[2]), -jnp.sin(xi[2]), xi[0]],
-        [jnp.sin(xi[2]),  jnp.cos(xi[2]), xi[1]],
-        [0, 0, 1]
-    ])
-
-def _get_corners(xi, car_params):
-
-    rot = _get_rotation_mat(xi)
-
-    # untransformed points
-    untransformed_corners = jnp.array([
-        [-car_params["rear_hang"], -car_params["width"] / 2, 1],
-        [ car_params["front_hang"] + car_params["wheel_base"], -car_params["width"] / 2, 1],
-        [ car_params["front_hang"] + car_params["wheel_base"], car_params["width"] / 2, 1],
-        [-car_params["rear_hang"],  car_params["width"] / 2, 1]
-    ])
-
-    # rotate and translate!
-    return (untransformed_corners @ rot.T)[:,:2]
-
-def _overlap(points, halfspaces):
-    # retrieve halfspace info of polygon: aibi @ x + ci = 0; equiv. to. ax + by + c = 0
-    ai = halfspaces[0]
-    bi = halfspaces[1]
-    ci = halfspaces[2]
-
-    x0 = points[:,0]
-    y0 = points[:,1]
-
-    sign = ai * x0 + bi * y0 + ci
-
-    # in_halfspaces = jnp.all((sign > 0), axis=0) 
-    # prior - same speed as the new robust one so no need to optimize 
-    # halfspace directions to be consistent - just use the logical_or
-    in_halfspaces = jnp.logical_or(jnp.all((sign > 0), axis=0), jnp.all((sign < 0), axis=0))
-    any_in_halfspaces = jnp.any(in_halfspaces)
-
-    #### TESTING ####
-
-    # # Define the range for x values
-    # x_vals = np.linspace(-15, 15, 100)
-
-    # # Defining a larger color palette
-    # colors = ['r', 'g', 'b', 'm', 'c', 'y']
-
-    # # Create the plot
-    # plt.figure(figsize=(8, 8))
-
-    # # Plotting each halfspace line
-    # for idx, (a, b, c) in enumerate(zip(halfspaces[0], halfspaces[1], halfspaces[2])):
-    #     a, b, c = a[0], b[0], c[0]
-    #     if b != 0:
-    #         # Calculate y values for the halfspace line
-    #         y_vals = (-a * x_vals - c) / b
-    #         plt.plot(x_vals, y_vals, label=f'Halfspace {idx + 1}', color=colors[idx])
-    #     else:
-    #         # Handle the case where b is 0 (vertical line)
-    #         x_intercept = -c / a
-    #         plt.axvline(x_intercept, label=f'Halfspace {idx + 1}', color=colors[idx])
-
-    # plt.scatter(x0, y0)
-
-    # # Set plot limits and labels
-    # plt.xlim([-15, 15])
-    # plt.ylim([-15, 15])
-    # plt.axhline(0, color='black',linewidth=0.5)
-    # plt.axvline(0, color='black',linewidth=0.5)
-    # plt.xlabel('x')
-    # plt.ylabel('y')
-    # plt.legend()
-    # plt.title('Plot of Halfspaces')
-    # plt.grid(True)
-    # plt.savefig('test.png', dpi=500)
-
-    #### End of Testing ####
-
-    return any_in_halfspaces # (~ jnp.any((sign > 0), axis=0)).sum() # point inside obstacle
 
 def _rectangle_obstacles(x, case_params, car_params):
     """check collision between rectangle and all other obstacles (including other car rectangles).
@@ -122,7 +41,7 @@ def _rectangle_obstacles(x, case_params, car_params):
     for i, xi in enumerate(x): # iterate through each agent in the env
         
         # corners of current ego car
-        corners = _get_corners(xi, car_params)
+        corners = geometry.get_corners(xi, car_params)
 
         # add the other agents to the list of obstacles at this time
         other_car_nums = car_nums.copy()
@@ -130,7 +49,7 @@ def _rectangle_obstacles(x, case_params, car_params):
         car_v = []
         car_h = []
         for j in other_car_nums:
-            _obs_v = _get_corners(x[j], car_params)
+            _obs_v = geometry.get_corners(x[j], car_params)
             car_v.append(_obs_v)
             # repeat the first point so we get all edges between vertices
             _obs_v = jnp.vstack([_obs_v, _obs_v[0]])
@@ -142,12 +61,12 @@ def _rectangle_obstacles(x, case_params, car_params):
 
         # check collision with other cars - only need to do one way test as we loop over all cars
         for j, k in zip(other_car_nums, range(len(other_car_nums))):
-            inside = _overlap(corners, car_h[k])
+            inside = geometry.overlap(corners, car_h[k])
             collision_matrix = collision_matrix.at[i,j].set(collision_matrix[i,j] + inside)
 
         # go through every obstacle for every corner
         for _obs_h in case_params["obs_h"]:
-            inside = _overlap(corners, _obs_h)
+            inside = geometry.overlap(corners, _obs_h)
             collision_matrix = collision_matrix.at[i,i].set(collision_matrix[i,i] + inside)
 
         # check every corner of every obstacle if its inside the agent
@@ -159,7 +78,7 @@ def _rectangle_obstacles(x, case_params, car_params):
         bi = _obs_v[1:, 0:1] - _obs_v[:-1, 0:1]
         ci = _obs_v[:-1, 0:1] * _obs_v[1:, 1:2] - _obs_v[1:, 0:1] * _obs_v[:-1, 1:2]
 
-        inside = _overlap(obs_v_vec, [ai, bi, ci])
+        inside = geometry.overlap(obs_v_vec, [ai, bi, ci])
         collision_matrix = collision_matrix.at[i,i].set(collision_matrix[i,i] + inside)
 
     return collision_matrix
@@ -234,7 +153,7 @@ if __name__ == "__main__":
     collision_matrix = _rectangle_obstacles(x, case_params, car_params)
 
     for xi in x:
-        corners = _get_corners(xi, car_params)
+        corners = geometry.get_corners(xi, car_params)
         plt.plot(corners[:,0], corners[:,1], 'black')
     plt.savefig('test.png', dpi=500)
 

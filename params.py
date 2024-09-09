@@ -1,12 +1,17 @@
 import numpy as np
 
-# car parameters
+# base parameters from which everything else is derived
 car_params = {
     "wheel_base": 2.8,
     "width": 1.942,
     "front_hang": 0.96,
     "rear_hang": 0.929,
     "max_steer": 0.5,
+}
+
+lidar_params = {
+    "num_beams": 200,
+    "max_dist": 10
 }
 
 # Testing equivalent setup to other hybrid a*
@@ -43,6 +48,9 @@ car_params["corners"] = np.array([
 car_params["center_to_front"] = car_params["wheel_base"]/2 + car_params["front_hang"]
 car_params["center_to_back"] = car_params["wheel_base"]/2 + car_params["rear_hang"]
 
+# calculate the distance from the lidar source to the car exterior to subtract from readings later
+angles = np.linspace(0, 2*np.pi, lidar_params["num_beams"])
 
+# car_params["lidar_calibration_dist"] = 
 
 
