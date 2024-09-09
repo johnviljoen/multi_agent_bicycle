@@ -73,7 +73,8 @@ def read(file: str):
 def write_case_csv(file_name, start_poses, goal_poses, obstacles):
     """
     Write a CSV file that represents a scenario with multiple cars, each with a start pose, goal pose, and obstacles.
-    
+    Yes a JSON would be a better fit for this if you want to rework the IO.
+
     :param file_name: Name of the output CSV file.
     :param start_poses: List of tuples or lists, where each tuple is (x0, y0, yaw0) for the start pose of a car.
     :param goal_poses: List of tuples or lists, where each tuple is (xf, yf, yawf) for the goal pose of a car.
@@ -146,6 +147,8 @@ def plot_case(case_params, car_params, filename=None, show=False, save=True, bar
 
 if __name__ == "__main__":
 
+    import jax.numpy as jnp
+    import jax.random as jr
     from params import car_params
 
     #### test 2 agent case ####
@@ -238,6 +241,27 @@ if __name__ == "__main__":
     write_case_csv('data/cases/test_4_agent_case.csv', start_poses, goal_poses, obstacles)
     case_params = read("data/cases/test_4_agent_case.csv")
     plot_case(case_params, car_params, filename='data/images/test_4_agent_case', show=False, save=True, bare=False)
+    plt.close()
 
+    #### test many obstacles ~100 case ####
 
+    obstacle_multiplier = 100
+    obstacles = jnp.concat([obstacles]*obstacle_multiplier, axis=0)
+    offsets = jr.uniform(jr.PRNGKey(0), minval=-15, maxval=15, shape=(obstacles.shape[0]))[:,None][:,:,None]
+    obstacles = obstacles + offsets
+
+    # Define start poses of the vehicles
+    start_poses = np.array([
+        [-3.0, -3.0, np.deg2rad(180)],  # Vehicle 0 starting from bottom-right, facing left
+        [-8.0, -7.0, np.deg2rad(0)],   # Vehicle 1 starting from bottom-left, facing right
+        [7.0, 7.0, np.deg2rad(90)],    # Vehicle 2 starting from top-right, facing upward
+        [4.0, 4.0, np.deg2rad(-90)]   # Vehicle 3 starting from top-left, facing downward
+    ])
+
+    # Write the scenario to a CSV file
+    write_case_csv('data/cases/test_many_obstacles.csv', start_poses, goal_poses, obstacles)
+    case_params = read("data/cases/test_many_obstacles.csv")
+    plot_case(case_params, car_params, filename='data/images/test_many_obstacles', show=False, save=True, bare=False)
+
+    
     print('fin')
