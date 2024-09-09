@@ -172,7 +172,7 @@ def _bubble_obstacles(x, case_params, car_params):
         case_params 
         car_params
     """
-    pass
+    raise NotImplementedError
 
 def rectangle_mask(x, case_params, car_params):
 

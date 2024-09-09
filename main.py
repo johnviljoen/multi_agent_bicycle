@@ -85,6 +85,9 @@ if __name__ == "__main__":
     scan_time = toc-tic
     print(toc-tic)
 
+    print(f"fps per vehicle for scan: {num_iter * num_envs / scan_time}")
+
+
     print('fin')
 
 
