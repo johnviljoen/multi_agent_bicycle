@@ -42,8 +42,50 @@ def _overlap(points, halfspaces):
 
     sign = ai * x0 + bi * y0 + ci
 
-    in_halfspaces = jnp.all((sign > 0), axis=0)
+    # in_halfspaces = jnp.all((sign > 0), axis=0) 
+    # prior - same speed as the new robust one so no need to optimize 
+    # halfspace directions to be consistent - just use the logical_or
+    in_halfspaces = jnp.logical_or(jnp.all((sign > 0), axis=0), jnp.all((sign < 0), axis=0))
     any_in_halfspaces = jnp.any(in_halfspaces)
+
+    #### TESTING ####
+
+    # # Define the range for x values
+    # x_vals = np.linspace(-15, 15, 100)
+
+    # # Defining a larger color palette
+    # colors = ['r', 'g', 'b', 'm', 'c', 'y']
+
+    # # Create the plot
+    # plt.figure(figsize=(8, 8))
+
+    # # Plotting each halfspace line
+    # for idx, (a, b, c) in enumerate(zip(halfspaces[0], halfspaces[1], halfspaces[2])):
+    #     a, b, c = a[0], b[0], c[0]
+    #     if b != 0:
+    #         # Calculate y values for the halfspace line
+    #         y_vals = (-a * x_vals - c) / b
+    #         plt.plot(x_vals, y_vals, label=f'Halfspace {idx + 1}', color=colors[idx])
+    #     else:
+    #         # Handle the case where b is 0 (vertical line)
+    #         x_intercept = -c / a
+    #         plt.axvline(x_intercept, label=f'Halfspace {idx + 1}', color=colors[idx])
+
+    # plt.scatter(x0, y0)
+
+    # # Set plot limits and labels
+    # plt.xlim([-15, 15])
+    # plt.ylim([-15, 15])
+    # plt.axhline(0, color='black',linewidth=0.5)
+    # plt.axvline(0, color='black',linewidth=0.5)
+    # plt.xlabel('x')
+    # plt.ylabel('y')
+    # plt.legend()
+    # plt.title('Plot of Halfspaces')
+    # plt.grid(True)
+    # plt.savefig('test.png', dpi=500)
+
+    #### End of Testing ####
 
     return any_in_halfspaces # (~ jnp.any((sign > 0), axis=0)).sum() # point inside obstacle
 
@@ -150,24 +192,27 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
     from params import car_params
-    from scenario import read
+    from scenario import read, plot_case
     import jax.random as jr
     import jax
     import functools
     from time import time
     
-    case_params = read("data/cases/test_case.csv")
+    case_params = read("data/cases/test_4_agent_case.csv")
     num_envs = 10
-    x = jnp.array([
-        [0, 0, jnp.deg2rad(20)],
-        [0, 2, jnp.deg2rad(20)]
-    ])
-    x = jnp.stack([x]*num_envs)
-    x = jr.normal(jr.PRNGKey(0), shape=x.shape)
+    # x = jnp.array([
+    #     [0, 0, jnp.deg2rad(20)],
+    #     [0, 2, jnp.deg2rad(20)]
+    # ])
+    # x = jnp.stack([x]*num_envs)
+    # x = jr.normal(jr.PRNGKey(0), shape=x.shape)
 
-    f = jax.jit(jax.vmap(functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params)))
+    x = jnp.array(case_params["start_poses"])
+    x = jnp.hstack([x, jnp.zeros([case_params["num_cars"], 1])]) # add zero velocity
+
+    # f = jax.jit(jax.vmap(functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params)))
     # f = jax.vmap(functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params))
-    # f = functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params)
+    f = functools.partial(_rectangle_obstacles, case_params=case_params, car_params=car_params)
     # x = x[0]
     violation = f(x)
     violation = f(x)
@@ -177,22 +222,21 @@ if __name__ == "__main__":
     toc = time()
     print(toc-tic)
 
-    x = jr.normal(jr.PRNGKey(1), shape=x.shape)
+    # x = jr.normal(jr.PRNGKey(1), shape=x.shape)
     tic = time()
     violation = f(x)
     toc = time()
     print(toc-tic)
 
-    # print(violation)
-    jx = x[0]
-    collision_matrix = _rectangle_obstacles(jx, case_params, car_params)
+    plot_case(case_params, car_params, save=False)
 
-    for xi in jx:
+    # print(violation)
+    collision_matrix = _rectangle_obstacles(x, case_params, car_params)
+
+    for xi in x:
         corners = _get_corners(xi, car_params)
         plt.plot(corners[:,0], corners[:,1], 'black')
     plt.savefig('test.png', dpi=500)
-
-
 
     # now lets plot an environment animation and see this in action
     # print(violation)
