@@ -1,6 +1,8 @@
+import jax
 import numpy as np
+import geometry
 
-# base parameters from which everything else is derived
+#### base parameters from which everything else is derived ####
 car_params = {
     "wheel_base": 2.8,
     "width": 1.942,
@@ -10,7 +12,7 @@ car_params = {
 }
 
 lidar_params = {
-    "num_beams": 200,
+    "half_num_beams": 100, # each beam is calculated bidirectionally
     "max_dist": 10
 }
 
@@ -33,6 +35,8 @@ lidar_params = {
 #     "max_steer": max_steer,
 # }
 
+#### Derive useful parameters from the base parameters above and add to dict ####
+
 # bubble for fast detection of potential collisions later on
 car_params["total_length"] = car_params["rear_hang"] + car_params["wheel_base"] + car_params["front_hang"]
 car_params["bubble_radius"] = np.hypot(car_params["total_length"] / 2, car_params["width"] / 2)
@@ -49,8 +53,23 @@ car_params["center_to_front"] = car_params["wheel_base"]/2 + car_params["front_h
 car_params["center_to_back"] = car_params["wheel_base"]/2 + car_params["rear_hang"]
 
 # calculate the distance from the lidar source to the car exterior to subtract from readings later
-angles = np.linspace(0, 2*np.pi, lidar_params["num_beams"])
+lidar_params["angles"] = np.linspace(0, np.pi, lidar_params["half_num_beams"])
 
+default_state = np.array([0,0,0,0])
+vertices: jax.numpy.ndarray = geometry.get_corners(default_state, car_params)
+halfspaces: jax.numpy.ndarray = geometry.get_halfspace_representation(vertices)
+
+# the values to subtract from the lidar readings later for distances to edge of car
+lidar_params["calibration_dist"], intersections = geometry.get_dist_to_polygons(default_state, lidar_params["angles"], [vertices], [halfspaces], max_dist=lidar_params["max_dist"])
+
+print('fin')
 # car_params["lidar_calibration_dist"] = 
 
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
+    plt.plot(vertices[:,0], vertices[:,1])
+    plt.scatter(intersections[:,0], intersections[:,1])
+    plt.savefig('test.png',dpi=500)
+
+    print('fin')

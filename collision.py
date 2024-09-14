@@ -1,10 +1,3 @@
-"""
-Description
------------
-
-To detect collisions in the most efficient way possible
-"""
-
 import geometry
 import jax.numpy as jnp
 
@@ -50,13 +43,8 @@ def _rectangle_obstacles(x, case_params, car_params):
         car_h = []
         for j in other_car_nums:
             _obs_v = geometry.get_corners(x[j], car_params)
+            ai, bi, ci = geometry.get_halfspace_representation(_obs_v)
             car_v.append(_obs_v)
-            # repeat the first point so we get all edges between vertices
-            _obs_v = jnp.vstack([_obs_v, _obs_v[0]])
-            # ax + by + c = 0
-            ai = _obs_v[:-1, 1:2] - _obs_v[1:, 1:2]
-            bi = _obs_v[1:, 0:1] - _obs_v[:-1, 0:1]
-            ci = _obs_v[:-1, 0:1] * _obs_v[1:, 1:2] - _obs_v[1:, 0:1] * _obs_v[:-1, 1:2]
             car_h.append([ai, bi, ci])
 
         # check collision with other cars - only need to do one way test as we loop over all cars
@@ -64,20 +52,14 @@ def _rectangle_obstacles(x, case_params, car_params):
             inside = geometry.overlap(corners, car_h[k])
             collision_matrix = collision_matrix.at[i,j].set(collision_matrix[i,j] + inside)
 
-        # go through every obstacle for every corner
+        # check every vertex of the ego car is outside every obstacle
         for _obs_h in case_params["obs_h"]:
             inside = geometry.overlap(corners, _obs_h)
             collision_matrix = collision_matrix.at[i,i].set(collision_matrix[i,i] + inside)
 
-        # check every corner of every obstacle if its inside the agent
+        # check every corner of every obstacle is outside ego car
         obs_v_vec = jnp.vstack(case_params["obs_v"])
-
-        # get the halfspaces for the current ego vehicle
-        _obs_v = jnp.vstack([corners, corners[0]])
-        ai = _obs_v[:-1, 1:2] - _obs_v[1:, 1:2]
-        bi = _obs_v[1:, 0:1] - _obs_v[:-1, 0:1]
-        ci = _obs_v[:-1, 0:1] * _obs_v[1:, 1:2] - _obs_v[1:, 0:1] * _obs_v[:-1, 1:2]
-
+        ai, bi, ci = geometry.get_halfspace_representation(corners)
         inside = geometry.overlap(obs_v_vec, [ai, bi, ci])
         collision_matrix = collision_matrix.at[i,i].set(collision_matrix[i,i] + inside)
 
