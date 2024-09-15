@@ -23,7 +23,8 @@ def run_small_scale(num_envs=10, Ti=0.0, Tf=5.0, Ts=0.1):
     actor_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(actor)))
     critic_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(critic)))
     collision_jit = jax.vmap(functools.partial(collision.rectangle_mask, case_params=case_params, car_params=car_params))
-
+    observation_jit = jax.vmap(functools.partial(lidar.observation, case_params=case_params, car_params=car_params, lidar_params=lidar_params))
+    
     u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
     u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
     x += xdot_jit(x, u) * Ts
@@ -38,6 +39,7 @@ def run_small_scale(num_envs=10, Ti=0.0, Tf=5.0, Ts=0.1):
         not_collisions.append(jnp.copy(collision_mask[-1]))
         u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
         x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
+        d = observation_jit(x)
         traj.append(jnp.copy(x[-1]))
         c = critic_jit(u)
     traj = jnp.stack(traj)
@@ -105,7 +107,8 @@ if __name__ == "__main__":
     import collision
     import models
     import dynamics
-    from params import car_params
+    import lidar
+    from params import car_params, lidar_params
     from animator import Animator
 
     seed = 0

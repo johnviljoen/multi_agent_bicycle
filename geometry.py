@@ -99,8 +99,8 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
             # find closest distances positive and negative - this method of using one distance calculation for 
             # positive and negative necessitates the positive and negative masking below (d>0, d<0), which might
             # be slower than just going around the whole way [0,2pi] rather than [0,pi] as this is.
-            _d_pos = min(_d_pos, jnp.min(d[d>0]))
-            _d_neg = max(_d_neg, jnp.max(d[d<0]))
+            _d_pos = min(_d_pos, jnp.min(d[d>0], initial=max_dist))
+            _d_neg = max(_d_neg, jnp.max(d[d<0], initial=-max_dist))
 
         # save the intersections found
         intersections = intersections.at[i*2:i*2+2].set(

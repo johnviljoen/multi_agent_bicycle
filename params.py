@@ -60,12 +60,22 @@ vertices: jax.numpy.ndarray = geometry.get_corners(default_state, car_params)
 halfspaces: jax.numpy.ndarray = geometry.get_halfspace_representation(vertices)
 
 # the values to subtract from the lidar readings later for distances to edge of car
-lidar_params["calibration_dist"], intersections = geometry.get_dist_to_polygons(default_state, lidar_params["angles"], [vertices], [halfspaces], max_dist=lidar_params["max_dist"])
+car_params["origin_to_edge"], intersections = geometry.get_dist_to_polygons(default_state, lidar_params["angles"], [vertices], [halfspaces], max_dist=lidar_params["max_dist"])
 
 print('fin')
 # car_params["lidar_calibration_dist"] = 
 
 if __name__ == "__main__":
+
+    # test observation
+    import lidar
+    import scenario
+    import jax.numpy as jnp
+    
+    case_params = scenario.read("data/cases/test_2_agent_case.csv")
+    x = jnp.array(case_params["start_poses"])
+    lidar.observation(x, case_params, car_params, lidar_params)
+
     import matplotlib.pyplot as plt
 
     plt.plot(vertices[:,0], vertices[:,1])
