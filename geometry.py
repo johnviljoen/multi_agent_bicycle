@@ -69,38 +69,31 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
         for v, h in zip(polygon_vertices, polygon_halfspaces):
             n = jnp.hstack([h[0], h[1]]).T # normals of the halfspaces
 
-            # d = ((v - l0) @ n) / (L2 @ n) # https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
-            d = jnp.empty(len(v))
+            # distance to intersection: d = ((v - l0) @ n) / (L2 @ n) # https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
             denom = l @ n
             num = jnp.einsum('ij,ji->i', v-l0, n)
-            
-            # when the lines are parallel the denominator is zero - set d to max distance
-            nonparallel_mask = denom != 0
-            d = d.at[~nonparallel_mask].set(max_dist)
 
-            # when lines are nonparallel we calculate the distance
-            nonparallel_distances = num[nonparallel_mask]/denom[nonparallel_mask]
-            clipped_nonparallel_distances = jnp.clip(nonparallel_distances, min=-max_dist, max=max_dist)
-            d = d.at[nonparallel_mask].set(clipped_nonparallel_distances)
-        
-            # we need to see if the intersection actually lies on the polygon - i.e. if there is a convex combination
-            # of the vertices defining the halfspace of the polygon that contains the intersection
-            p = l0 + l * d[nonparallel_mask][:,None]
-            v_cyclic = jnp.vstack([v, v[0]])
-            edges = (v_cyclic[:-1] - v_cyclic[1:])[nonparallel_mask]
-            edges_dot_edges = jnp.einsum('ij,ij->i', edges, edges)
-            collinear_vec = v[nonparallel_mask] - p
-            vec_dot_edge = jnp.einsum('ij,ij->i', collinear_vec, edges)
-            intersection_mask = jnp.logical_and(vec_dot_edge < edges_dot_edges, 0 < vec_dot_edge)
-            nonparallel_nonintersecting_mask = nonparallel_mask
-            nonparallel_nonintersecting_mask = nonparallel_nonintersecting_mask.at[nonparallel_mask].set(~intersection_mask)
-            d = d.at[nonparallel_nonintersecting_mask].set(max_dist)
+            # when lines are parallel then we have infinite distance to intersection
+            parallel_mask = denom == 0
+            _d = jnp.clip(num/denom, min=-max_dist, max=max_dist)
+
+            # for all nonparallel lines we want to see if they lie between vertices on the polygon
+            p = l0 + l * _d[:,None] # the point of intersection
+            _v = jnp.vstack([v, v[0]]) # stack vertices for convenience of finding edges
+            e = (_v[:-1] - _v[1:]) # edges of polygon
+            e_dot_e = jnp.einsum('ij,ij->i', e, e) # edge dotted with itself
+            c = v - p # collinear vector on halfspace
+            c_dot_e = jnp.einsum('ij,ij->i', c, e) # collinear vector dotted with edge
+            intersection_mask = jnp.logical_and(c_dot_e < e_dot_e, 0 < c_dot_e) # draw the geometry to convince yourself
+            parallel_or_nonintersecting = jnp.logical_or(parallel_mask, ~intersection_mask)
+            d = jnp.where(parallel_or_nonintersecting, max_dist, _d)
 
             # find closest distances positive and negative - this method of using one distance calculation for 
             # positive and negative necessitates the positive and negative masking below (d>0, d<0), which might
             # be slower than just going around the whole way [0,2pi] rather than [0,pi] as this is.
-            _d_pos = min(_d_pos, jnp.min(d[d>0], initial=max_dist))
-            _d_neg = max(_d_neg, jnp.max(d[d<0], initial=-max_dist))
+            _d_pos = jnp.minimum(_d_pos, jnp.min(d, where=d > 0, initial=max_dist))
+            _d_neg = jnp.maximum(_d_neg, jnp.max(d, where=d < 0, initial=-max_dist))
+
 
         # save the intersections found
         intersections = intersections.at[i*2:i*2+2].set(

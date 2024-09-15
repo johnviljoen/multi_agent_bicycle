@@ -69,6 +69,7 @@ def run_large_scale(num_envs=10_000, Ti=0.0, Tf=10_000, Ts=0.1):
     actor_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(actor)))
     critic_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(critic)))
     collision_jit = jax.vmap(functools.partial(collision.rectangle_mask, case_params=case_params, car_params=car_params))
+    observation_jit = jax.vmap(functools.partial(lidar.observation, case_params=case_params, car_params=car_params, lidar_params=lidar_params))
 
     u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
     u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
@@ -82,6 +83,7 @@ def run_large_scale(num_envs=10_000, Ti=0.0, Tf=10_000, Ts=0.1):
         collision_mask = collision_jit(x)
         u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
         x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
+        d = observation_jit(x)
         c = critic_jit(u)
         return (x, _rng, rng), None  
 
@@ -121,8 +123,8 @@ if __name__ == "__main__":
     actor = models.StochasticActor([4,32,32,2], _rng); _rng, rng = jr.split(rng)
     critic = models.DoubleCritic([2,32,32,1], _rng); _rng, rng = jr.split(rng)
 
-    run_small_scale()
-    
+    # run_small_scale()
+    run_large_scale(num_envs=10000, Tf=10000.0)
 
     print('fin')
 
