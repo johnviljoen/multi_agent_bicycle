@@ -9,7 +9,7 @@ def get_halfspace_representation(vertices):
     c = vertices[:-1, 0:1] * vertices[1:, 1:2] - vertices[1:, 0:1] * vertices[:-1, 1:2]
     return a, b, c
 
-def get_rotation_mat(xi):
+def get_transform_mat(xi):
 
     return jnp.array([
         [jnp.cos(xi[2]), -jnp.sin(xi[2]), xi[0]],
@@ -17,9 +17,16 @@ def get_rotation_mat(xi):
         [0, 0, 1]
     ])
 
+def get_rotation_mat(xi):
+
+    return jnp.array([
+        [jnp.cos(xi[2]), -jnp.sin(xi[2])],
+        [jnp.sin(xi[2]),  jnp.cos(xi[2])]
+    ])
+
 def get_corners(xi, car_params):
 
-    rot = get_rotation_mat(xi)
+    rot = get_transform_mat(xi)
 
     # untransformed points
     untransformed_corners = jnp.array([
@@ -50,12 +57,29 @@ def overlap(points, halfspaces):
 
 def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, max_dist):
 
-    """distance to the closest polygon in a list of polygons of a line with a given start position,
-    with a max distance given.
+    """calculate all lidar beam distance measurements to the nearest polygon and return the 
+    distance and the intersection coordinate in cartesian space. If the distance is larger than
+    max_dist we return max dist and the corresponding coordinate
+
+    algorithm:
+    - use d = ((v - l0) @ n) / (L2 @ n) to calculate beam distance to halfspace
+    - clip d between -max_dist and max_dist to get rid of infinities for parallel lines
+    - calculate point of intersection p for all beams with and without valid intersections (GPU requirement)
+    - use dot product criterion to determine if intersections are within vertices defining polygon edge
+        - if between vertices: 0 < vec_p_v2 @ vec_v1_v2 < vec_v1_v2 @ vec_v1_v2
+        - where @ represents the dot operation - draw it out to convince yourself!
+        - I apologise for using einsums - they make things more concise and efficient!
+
+    everything else is bookeeping/boilerplate/minor details.
+
+    I am not sure what a more efficient way to do this in jax would be, as we are quite restricted
+    by the jit requirements on boolean masks to minimize unecessary compute.
     """
     
     l0 = xi[0:2] # {x,y} position starting the line
     l1 = jnp.array([[jnp.cos(angle), jnp.sin(angle)] for angle in half_angles]) # unit direction vectors
+    rot = get_rotation_mat(xi)
+    l1 = l1 @ rot.T # rotate the lidar beams with the car yaw
 
     d_pos = jnp.ones(len(l1)) * max_dist
     d_neg = jnp.ones(len(l1)) * -max_dist
@@ -94,7 +118,6 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
             _d_pos = jnp.minimum(_d_pos, jnp.min(d, where=d > 0, initial=max_dist))
             _d_neg = jnp.maximum(_d_neg, jnp.max(d, where=d < 0, initial=-max_dist))
 
-
         # save the intersections found
         intersections = intersections.at[i*2:i*2+2].set(
             jnp.vstack(
@@ -102,64 +125,11 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
                  l0 + l * _d_neg]
             )
         )
-        
         d_pos = d_pos.at[i].set(_d_pos)
         d_neg = d_neg.at[i].set(_d_neg)
 
-    distances = jnp.hstack([d_pos, -d_neg])
-
+    distances = jnp.hstack([d_pos, -d_neg]) # stack distances and uninvert negative distances
     return distances, intersections
-
-
-def alt_get_dist_to_polygons(xi, angles, polygon_vertices, polygon_halfspaces, max_dist):
-
-    """
-    UNFINISHED - might be faster than the above - might be slower
-
-    distance to the closest polygon in a list of polygons of a line with a given start position,
-    with a max distance given.
-    """
-    
-    l0 = xi[0:2] # {x,y} position starting the line
-    l1 = jnp.array([[jnp.cos(angle), jnp.sin(angle)] for angle in angles]) # unit direction vectors
-
-    distances = jnp.ones(len(l1)) * max_dist
-
-    for i, l in enumerate(l1):
-
-        _d = max_dist
-
-        for v, h in zip(polygon_vertices, polygon_halfspaces):
-            n = jnp.hstack([h[0], h[1]]).T # normals of the halfspaces
-
-            # d = ((v - l0) @ n) / (L2 @ n) # https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
-            d = jnp.empty(len(v))
-            denom = l @ n
-            num = jnp.einsum('ij,ji->i', v-l0, n)
-            
-            # when the lines are parallel the denominator is zero - set d to max distance
-            nonparallel_mask = denom != 0
-
-            d = d.at[~nonparallel_mask].set(max_dist)
-
-            # when lines are nonparallel we calculate the distance
-            nonparallel_distances = num[nonparallel_mask]/denom[nonparallel_mask]
-            clipped_nonparallel_distances = jnp.clip(nonparallel_distances, min=-max_dist, max=max_dist)
-            
-            # when distance is negative we ignore - as we go whole way around circle
-            pos_mask = clipped_nonparallel_distances > 0
-            d = d.at[nonparallel_mask].set(clipped_nonparallel_distances)
-        
-            # find closest distances positive and negative - this method of using one distance calculation for 
-            # positive and negative necessitates the positive and negative masking below (d>0, d<0), which might
-            # be slower than just going around the whole way [0,2pi] rather than [0,pi] as this is.
-            _d_pos = min(_d_pos, jnp.min(d[d>0]))
-            _d_neg = max(_d_neg, jnp.max(d[d<0]))
-        
-        d_pos = d_pos.at[i].set(_d_pos)
-        d_neg = d_neg.at[i].set(_d_neg)
-
-    distances = jnp.hstack([d_pos, -d_neg])
 
 
 if __name__ == "__main__":

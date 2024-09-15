@@ -62,9 +62,6 @@ halfspaces: jax.numpy.ndarray = geometry.get_halfspace_representation(vertices)
 # the values to subtract from the lidar readings later for distances to edge of car
 car_params["origin_to_edge"], intersections = geometry.get_dist_to_polygons(default_state, lidar_params["angles"], [vertices], [halfspaces], max_dist=lidar_params["max_dist"])
 
-print('fin')
-# car_params["lidar_calibration_dist"] = 
-
 if __name__ == "__main__":
 
     # test observation
