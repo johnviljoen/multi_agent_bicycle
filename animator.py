@@ -2,16 +2,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 import matplotlib.colors as mcolors
-from scenario import get_corners
+import jax
+import functools
+
+import scenario
+import lidar
 
 class Animator:
     def __init__(
             self,
             car_params,
             case_params,
+            lidar_params,
             traj,
             times,
-            beam_points = None,
             collisions = None,
             max_frames = 500,
             Ts = 0.1,
@@ -27,8 +31,15 @@ class Animator:
         self.dpi = dpi
         self.car_params = car_params
         self.case_params = case_params
-        self.beam_points = beam_points
+        self.lidar_params = lidar_params
         self.named_colors = list(mcolors.CSS4_COLORS.keys())
+
+        self.lidar_coordinate_observation = jax.jit(
+            functools.partial(lidar.coordinate_observation, 
+                              case_params=case_params,
+                              car_params=car_params,
+                              lidar_params=lidar_params)
+            )
 
         num_steps = len(times)
         def compute_render_interval(num_steps, max_frames):
@@ -75,11 +86,11 @@ class Animator:
 
         for pose in case_params["start_poses"]:
             self.ax.arrow(pose[0], pose[1], np.cos(pose[2]), np.sin(pose[2]), width=0.2, color = "gold")
-            temp = get_corners(car_params, pose[0], pose[1], pose[2])
+            temp = scenario.get_corners(car_params, pose[0], pose[1], pose[2])
             self.ax.plot(temp[:, 0], temp[:, 1], linestyle='--', linewidth = 0.4, color = 'green')
         for pose in case_params["goal_poses"]:
             self.ax.arrow(pose[0], pose[1], np.cos(pose[2]), np.sin(pose[2]), width=0.2, color = "gold")
-            temp = get_corners(car_params, pose[0], pose[1], pose[2])
+            temp = scenario.get_corners(car_params, pose[0], pose[1], pose[2])
             self.ax.plot(temp[:, 0], temp[:, 1], linestyle='--', linewidth = 0.4, color = 'red')
 
         # create the lines used for dynamic elements
@@ -92,19 +103,21 @@ class Animator:
 
     def update_lines(self, i):
 
-        joint_state = self.traj[i]
-        collision = self.collisions[i]
-        for i, state in enumerate(joint_state):
-            corners = get_corners(self.car_params, state[0], state[1], state[2])
-            self.lines[i].set_data(corners[:,0], corners[:,1])
-            if collision[i] == True:
-                self.lines[i].set_color('red')
-            else:
-                self.lines[i].set_color('green')
+        print(f"frame: {i}")
 
-            if self.beam_points is not None:
-                self.scatter_points[i].set_data(self.beam_points[:,0], self.beam_points[:,1])
-                self.scatter_points[i].set_color(self.named_colors[i])
+        joint_state = self.traj[i]
+        beam_points = self.lidar_coordinate_observation(joint_state)
+        collision = self.collisions[i]
+        for j, state in enumerate(joint_state):
+            corners = scenario.get_corners(self.car_params, state[0], state[1], state[2])
+            self.lines[j].set_data(corners[:,0], corners[:,1])
+            if collision[j] == True:
+                self.lines[j].set_color('red')
+            else:
+                self.lines[j].set_color('green')
+        
+            self.scatter_points[j].set_data(beam_points[j,:,0], beam_points[j,:,1])
+            self.scatter_points[j].set_color(self.named_colors[j])
 
         self.title_time.set_text(u"Time = {:.2f} s".format(self.times[i]))
 

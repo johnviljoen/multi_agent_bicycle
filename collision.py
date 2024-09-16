@@ -29,23 +29,13 @@ def _rectangle_obstacles(x, case_params, car_params):
     """
 
     collision_matrix = jnp.empty([case_params["num_cars"], case_params["num_cars"]])
-    car_nums = [i for i in range(case_params["num_cars"])]
+    # car_nums = [i for i in range(case_params["num_cars"])]
 
     for i, xi in enumerate(x): # iterate through each agent in the env
         
         # corners of current ego car
         corners = geometry.get_corners(xi, car_params)
-
-        # add the other agents to the list of obstacles at this time
-        other_car_nums = car_nums.copy()
-        other_car_nums.remove(i)
-        car_v = []
-        car_h = []
-        for j in other_car_nums:
-            _obs_v = geometry.get_corners(x[j], car_params)
-            ai, bi, ci = geometry.get_halfspace_representation(_obs_v)
-            car_v.append(_obs_v)
-            car_h.append([ai, bi, ci])
+        _, car_h, other_car_nums = geometry.get_vertices_and_halfspaces_of_all_cars_except_index(x,i,case_params,car_params)
 
         # check collision with other cars - only need to do one way test as we loop over all cars
         for j, k in zip(other_car_nums, range(len(other_car_nums))):

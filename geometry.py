@@ -78,7 +78,7 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
     
     l0 = xi[0:2] # {x,y} position starting the line
     l1 = jnp.array([[jnp.cos(angle), jnp.sin(angle)] for angle in half_angles]) # unit direction vectors
-    rot = get_rotation_mat(xi)
+    rot = jnp.eye(2) # get_rotation_mat(xi)
     l1 = l1 @ rot.T # rotate the lidar beams with the car yaw
 
     d_pos = jnp.ones(len(l1)) * max_dist
@@ -131,6 +131,24 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
     distances = jnp.hstack([d_pos, -d_neg]) # stack distances and uninvert negative distances
     return distances, intersections
 
+def get_vertices_and_halfspaces_of_all_cars_except_index(
+        x, # joint state
+        index, # the index of the car being ignored
+        case_params,
+        car_params
+    ):
+    
+    car_nums = [i for i in range(case_params["num_cars"])]
+    car_nums.remove(index)
+    vertices = []
+    halfspaces = []
+    for i in car_nums:
+        _obs_v = get_corners(x[i], car_params)
+        ai, bi, ci = get_halfspace_representation(_obs_v)
+        vertices.append(_obs_v)
+        halfspaces.append([ai, bi, ci])
+
+    return vertices, halfspaces, car_nums
 
 if __name__ == "__main__":
 

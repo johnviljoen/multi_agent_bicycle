@@ -2,6 +2,9 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+
+
 def get_corners(car_params, x, y, yaw):
     points = np.array([
         [-car_params["rear_hang"], -car_params["width"] / 2, 1],
