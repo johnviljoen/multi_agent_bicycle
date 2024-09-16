@@ -78,7 +78,7 @@ def get_dist_to_polygons(xi, half_angles, polygon_vertices, polygon_halfspaces, 
     
     l0 = xi[0:2] # {x,y} position starting the line
     l1 = jnp.array([[jnp.cos(angle), jnp.sin(angle)] for angle in half_angles]) # unit direction vectors
-    rot = jnp.eye(2) # get_rotation_mat(xi)
+    rot = get_rotation_mat(xi) # jnp.eye(2) # get_rotation_mat(xi)
     l1 = l1 @ rot.T # rotate the lidar beams with the car yaw
 
     d_pos = jnp.ones(len(l1)) * max_dist

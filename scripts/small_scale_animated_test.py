@@ -22,8 +22,8 @@ case_params = scenario.read("data/cases/test_4_agent_case.csv")
 # case_params = scenario.read("data/cases/test_2_agent_case.csv")
 num_envs=10; Ti=0.0; Tf=5.0; Ts=0.1
 xdot = functools.partial(dynamics.xdot, car_params=car_params)
-obs_size = lidar_params["half_num_beams"] * 2 + 4
-# obs_size = 4
+# obs_size = lidar_params["half_num_beams"] * 2 + 4
+obs_size = 4
 actor = models.StochasticActor([obs_size,32,32,2], _rng); _rng, rng = jr.split(rng)
 critic = models.DoubleCritic([2,32,32,1], _rng); _rng, rng = jr.split(rng)
 

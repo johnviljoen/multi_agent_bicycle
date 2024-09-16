@@ -12,7 +12,7 @@ car_params = {
 }
 
 lidar_params = {
-    "half_num_beams": 100, # each beam is calculated bidirectionally
+    "half_num_beams": 100, # 100, # each beam is calculated bidirectionally
     "max_dist": 10
 }
 
