@@ -55,7 +55,7 @@ car_params["center_to_back"] = car_params["wheel_base"]/2 + car_params["rear_han
 # calculate the distance from the lidar source to the car exterior to subtract from readings later
 lidar_params["angles"] = np.linspace(0, np.pi, lidar_params["half_num_beams"])
 
-default_state = np.array([0,0,0,0])
+default_state = np.array([0.,0.,0.,0.])
 vertices: jax.numpy.ndarray = geometry.get_corners(default_state, car_params)
 halfspaces: jax.numpy.ndarray = geometry.get_halfspace_representation(vertices)
 

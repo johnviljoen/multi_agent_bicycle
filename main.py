@@ -22,11 +22,14 @@ def run_small_scale(num_envs=10, Ti=0.0, Tf=5.0, Ts=0.1):
     xdot_jit = jax.jit(jax.vmap(jax.vmap(xdot)))
     actor_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(actor)))
     critic_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(critic)))
-    collision_jit = jax.vmap(functools.partial(collision.rectangle_mask, case_params=case_params, car_params=car_params))
-    observation_jit = jax.vmap(functools.partial(lidar.observation, case_params=case_params, car_params=car_params, lidar_params=lidar_params))
+    collision_jit = jax.jit(jax.vmap(functools.partial(collision.rectangle_mask, case_params=case_params, car_params=car_params)))
+    observation_jit = jax.jit(jax.vmap(functools.partial(lidar.observation, case_params=case_params, car_params=car_params, lidar_params=lidar_params)))
     
-    u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
-    u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+    d = observation_jit(x)
+    d = observation_jit(x)
+    y = jnp.concat([x,d], axis=2)
+    u = actor_jit(y, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+    u = actor_jit(y, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
     x += xdot_jit(x, u) * Ts
     x += xdot_jit(x, u) * Ts
     collision_mask = collision_jit(x)
@@ -37,7 +40,8 @@ def run_small_scale(num_envs=10, Ti=0.0, Tf=5.0, Ts=0.1):
     for _ in range(num_iter):
         collision_mask = collision_jit(x)
         not_collisions.append(jnp.copy(collision_mask[-1]))
-        u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+        y = jnp.concat([x,d], axis=2)
+        u = actor_jit(y, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
         x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
         d = observation_jit(x)
         traj.append(jnp.copy(x[-1]))
@@ -68,11 +72,14 @@ def run_large_scale(num_envs=10_000, Ti=0.0, Tf=10_000, Ts=0.1):
     xdot_jit = jax.jit(jax.vmap(jax.vmap(xdot)))
     actor_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(actor)))
     critic_jit = eqx.filter_jit(eqx.filter_vmap(eqx.filter_vmap(critic)))
-    collision_jit = jax.vmap(functools.partial(collision.rectangle_mask, case_params=case_params, car_params=car_params))
-    observation_jit = jax.vmap(functools.partial(lidar.observation, case_params=case_params, car_params=car_params, lidar_params=lidar_params))
-
-    u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
-    u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+    collision_jit = jax.jit(jax.vmap(functools.partial(collision.rectangle_mask, case_params=case_params, car_params=car_params)))
+    observation_jit = jax.jit(jax.vmap(functools.partial(lidar.observation, case_params=case_params, car_params=car_params, lidar_params=lidar_params)))
+    
+    d = observation_jit(x)
+    d = observation_jit(x)
+    y = jnp.concat([x,d], axis=2)
+    u = actor_jit(y, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+    u = actor_jit(y, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
     x += xdot_jit(x, u) * Ts
     x += xdot_jit(x, u) * Ts
     collision_mask = collision_jit(x)
@@ -81,11 +88,13 @@ def run_large_scale(num_envs=10_000, Ti=0.0, Tf=10_000, Ts=0.1):
     def scan_body(carry, _):
         x, _rng, rng = carry
         collision_mask = collision_jit(x)
-        u = actor_jit(x, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
+        d = observation_jit(x)
+        y = jnp.concat([x,d], axis=2)
+        u = actor_jit(y, jr.split(_rng, num=[num_envs, num_agents])); _rng, rng = jr.split(rng)
         x += xdot_jit(x, u_control) * Ts * collision_mask[:, :, None] # if collided freeze
         d = observation_jit(x)
         c = critic_jit(u)
-        return (x, _rng, rng), None  
+        return (x, _rng, rng), None
 
     tic = time()
     (x, _, _), _ = jax.lax.scan(scan_body, (x, _rng, rng), None, length=num_iter)
@@ -120,7 +129,8 @@ if __name__ == "__main__":
     # case_params = scenario.read("data/cases/test_2_agent_case.csv")
 
     xdot = functools.partial(dynamics.xdot, car_params=car_params)
-    actor = models.StochasticActor([4,32,32,2], _rng); _rng, rng = jr.split(rng)
+    obs_size = lidar_params["half_num_beams"] * 2 + 4
+    actor = models.StochasticActor([obs_size,32,32,2], _rng); _rng, rng = jr.split(rng)
     critic = models.DoubleCritic([2,32,32,1], _rng); _rng, rng = jr.split(rng)
 
     # run_small_scale()

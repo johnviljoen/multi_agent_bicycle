@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
+import matplotlib.colors as mcolors
 from scenario import get_corners
 
 class Animator:
@@ -10,6 +11,7 @@ class Animator:
             case_params,
             traj,
             times,
+            beam_points = None,
             collisions = None,
             max_frames = 500,
             Ts = 0.1,
@@ -25,7 +27,8 @@ class Animator:
         self.dpi = dpi
         self.car_params = car_params
         self.case_params = case_params
-
+        self.beam_points = beam_points
+        self.named_colors = list(mcolors.CSS4_COLORS.keys())
 
         num_steps = len(times)
         def compute_render_interval(num_steps, max_frames):
@@ -81,9 +84,11 @@ class Animator:
 
         # create the lines used for dynamic elements
         # ------------------------------------------
-        self.lines = []
+        self.lines = [] # lines to draw cars
+        self.scatter_points = [] # points to draw car lidar beams
         for _ in range(case_params["num_cars"]):
             self.lines.append(self.ax.plot([], [], lw=2, color='black')[0])
+            self.scatter_points.append(self.ax.plot([], [], 'ro')[0])
 
     def update_lines(self, i):
 
@@ -96,6 +101,10 @@ class Animator:
                 self.lines[i].set_color('red')
             else:
                 self.lines[i].set_color('green')
+
+            if self.beam_points is not None:
+                self.scatter_points[i].set_data(self.beam_points[:,0], self.beam_points[:,1])
+                self.scatter_points[i].set_color(self.named_colors[i])
 
         self.title_time.set_text(u"Time = {:.2f} s".format(self.times[i]))
 

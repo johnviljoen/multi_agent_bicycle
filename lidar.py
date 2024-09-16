@@ -3,6 +3,11 @@ import geometry
 
 def observation(x, case_params, car_params, lidar_params):
 
+    """this is largely a wrapper around geometry.get_dist_to_polygons function
+    to ensure compatibility with the scene description I am using - if you are
+    interested in how the lidar calculation algorithm works you should look there!
+    """
+
     static_vertices = case_params["obs_v"]
     static_halfspaces = case_params["obs_h"]
     car_nums = [i for i in range(case_params["num_cars"])]
